@@ -1,0 +1,56 @@
+name: Profile Update
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+# FIX 1: Add required permissions for pushing to repo
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+
+    steps:
+    # FIX 2: Update actions/checkout from v3 to v4 (Node.js 20 deprecation)
+    - uses: actions/checkout@v4
+      with:
+        # FIX 3: Add token for authentication
+        token: ${{ secrets.GITHUB_TOKEN }}
+        # FIX 4: Fetch full history to allow commits
+        fetch-depth: 0
+
+    - name: Update README with latest stats
+      run: |
+        echo "Last Updated: $(date)" >> update.log
+
+    # FIX 5: Configure git with proper identity
+    - name: Configure Git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+
+    # FIX 6: Check if there are changes before committing
+    - name: Check for changes
+      id: verify-changed-files
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+        fi
+
+    # FIX 7: Commit and push only if there are changes
+    - name: Commit changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git add update.log
+        git commit -m "chore: update profile stats"
+        
+    - name: Push changes
+      if: steps.verify-changed-files.outputs.changed == 'true'
+      run: |
+        git push origin ${{ github.ref_name }}
